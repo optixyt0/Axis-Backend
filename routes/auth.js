@@ -50,7 +50,7 @@ app.post("/account/api/oauth/token", async (req, res) => {
         "mver": false,
         "clid": clientId,
         "dn": user.username,
-        "am": grant_type,
+        "am": "password",
         "p": Buffer.from(functions.MakeID()).toString("base64"),
         "iai": user.accountId,
         "sec": 1,
