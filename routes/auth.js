@@ -5,22 +5,28 @@ const bcrypt = require('bcrypt');
 const User = require('../models/user.js');
 const Token = require('../models/token.js');
 const uuid = require("uuid");
-const mongoose = require('mongoose');
+const crypto = require('crypto');
+const { LEGAL_TCP_SOCKET_OPTIONS } = require('mongodb');
 require('dotenv').config();
 
 app.post("/account/api/oauth/token", async (req, res) => {
     const { username, password, grant_type } = req.body;
+
     if (!username || !password) {
         return res.status(400).json({ errorCode: "com.axis.backend.oauth.invalid_request", errorMessage: "Email and Password are required." });
     }
-    const user = User.findOne({ email: username });
+
+    const user = await User.findOne({ email: username });
     if (!user) {
         return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "No account was found with that email." });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
-        return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "You have provided the incorrect password." });
+        return res.status(400).json({
+            errorCode: "com.axis.backend.incorrect-credentials",
+            errorMessage: "You have provided the incorrect password."
+        });
     }
 
     if (user.banned) {
@@ -41,8 +47,9 @@ app.post("/account/api/oauth/token", async (req, res) => {
     }
 
     if (!clientId) {
-        throw new Error("ClientId could not be extracted");
+        return res.status(400).json({ errorCode: "com.axis.backend.invalid_client", errorMessage: "ClientId could not be extracted" });
     }
+
     const deviceId = uuid.v4().replace(/-/ig, "");
 
     let current_token = await Token.findOne({ accountId: user.accountId });
@@ -87,5 +94,48 @@ app.post("/account/api/oauth/token", async (req, res) => {
         device_id: deviceId
     });
 });
+
+app.get("/account/api/public/account/:accountId", (req, res) => {
+    const { accountId } = req.params;
+
+    if (!accountId) {
+        return res.status(400).json({ errorCode: "com.axis.backend.no_accountid", errorMessage: "Account ID was not supplied." });
+    }
+
+    const user = User.findOne({ accountId: accountId });
+
+    if (!user) {
+        return res.status(400).json({ errorCode: "com.axis.backend.invalid_user", errorMessage: "User was not found in database." });
+    }
+
+    return res.status(200).json({
+        id: accountId,
+        displayName: user.username,
+        email: user.email,
+        externalAuths: {}
+    });
+});
+
+app.get("/account/api/public/account/:accountId/externalAuths", (req, res) => {
+    const { accountId } = req.params;
+
+    if (!accountId) {
+        return res.status(400).json({ errorCode: "com.axis.backend.no_accountid", errorMessage: "Account ID was not supplied." });
+    }
+
+    return res.status(200).json({
+        accountId: accountId,
+        externalAuths: []
+    });
+});
+
+app.delete('/account/api/oauth/sessions/kill', async (req, res) => {
+    await Token.deleteMany({});
+    return res.status(200).json({ message: 'Sessions killed' });
+});
+
+app.post("/fortnite/api/game/v2/tryPlayOnPlatform/account/*", (req, res) => {
+    return res.send("true");
+})
 
 module.exports = app;
