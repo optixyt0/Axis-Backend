@@ -5,10 +5,11 @@ const bcrypt = require('bcrypt');
 const User = require('../models/user.js');
 const Token = require('../models/token.js');
 const uuid = require("uuid");
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 app.post("/account/api/oauth/token", async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, grant_type } = req.body;
     if (!username || !password) {
         return res.status(400).json({ errorCode: "com.axis.backend.oauth.invalid_request", errorMessage: "Email and Password are required." });
     }
@@ -17,7 +18,7 @@ app.post("/account/api/oauth/token", async (req, res) => {
         return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "No account was found with that email." });
     }
 
-    const isPasswordCorrect = bcrypt.compare(password, user.password)
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
         return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "You have provided the incorrect password." });
     }

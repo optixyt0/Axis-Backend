@@ -2,6 +2,8 @@ const express = require('express');
 const app = express();
 const bcrypt = require('bcrypt');
 const User = require('../models/user.js');
+const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
 app.listen(5555, () => {
     console.log('API listening on port 5555.');
@@ -58,6 +60,28 @@ function generateAccountId() {
     return accountId.toUpperCase();
 }
 
+async function hashPassword(password) {
+    try {
+      if (!password) {
+        throw new Error('Password is required');
+      }
+  
+
+      const salt = await bcrypt.genSalt(15);
+
+      if (!salt) {
+        throw new Error('Salt generation failed');
+      }
+  
+
+      const hashedPassword = await bcrypt.hash(password, salt);
+  
+      return hashedPassword;
+    } catch (err) {
+      console.error('Error hashing password:', err.message);
+    }
+  }
+
 app.post('/backend/register', async(req, res) => {
     const { email, username, password } = req.body;
     const user = User.findOne({ email: email });
@@ -66,19 +90,20 @@ app.post('/backend/register', async(req, res) => {
         res.json({ message: "You already have an account!", succeeded: "false" });
     }
 
-    const hashedPassword = bcrypt.hash(password, 15);
+    const salt = await bcrypt.genSalt(15);
+    const hashedPassword = await hashPassword(password);
 
     const newUser = new User({
         created: new Date(),
         banned: false,
         accountId: generateAccountId(),
         username: username,
-        username_lower: username.toLowerCase(),
+        username_lower: username?.toLowerCase(),
         email: email,
         password: hashedPassword
     });
 
     await newUser.save();
 
-    res.json({ message: "Welcome to Axis " + username + "!", succeeded: "true" });
+    res.json({ message: "Welcome to Axis " + username + "!", email: email, accountId: newUser.accountId, password: hashedPassword, succeeded: "true" });
 });

@@ -3,6 +3,7 @@ const app = express();
 require('dotenv').config();
 const mongoose = require('mongoose');
 const fs = require('fs');
+const bp = require('body-parser');
 
 
 
@@ -10,25 +11,30 @@ const PORT = process.env.PORT || 3551;
 
 const DB_URI = process.env.DB_URI || "mongodb://localhost/Axis";
 
-app.listen(PORT, () => {
+app.listen(PORT, async() => {
     console.log("Axis Backend listening on port " + PORT);
     console.log("Made with effort from @optixyt <3");
-    connectDB();
+    await connectDB();
     require('./api/api.js');
 
 });
 
 app.use(express.json());
+app.use(bp.urlencoded({ extended: true }));
 fs.readdirSync("./routes").forEach(fileName => {
     app.use(require(`./routes/${fileName}`));
 });
 
-function connectDB() {
-    const conn = mongoose.createConnection(DB_URI);
-
-    conn.on('connected', () => console.log('Connected to MongoDB!'));
-    conn.on('disconnected', () => console.log('Disconnected from MongoDB.'));
+async function connectDB() {
+    try {
+        await mongoose.connect(DB_URI)
+        console.log("Connected to MongoDB!")
+    } catch(err) {
+        console.log("Failed to connect to MongoDB: " + err)
+    }
+    
 }
+
 
 app.get('/', (req, res) => {
     res.json({ name: "Axis Backend", creator: "OptiX YT" });
