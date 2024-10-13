@@ -1,4 +1,4 @@
 # Axis-Backend
-Backend made for Axis by OptiX YT
+Fully custom OGFN backend, work in progress
 
-## DO NOT SHARE WITHOUT PERMISSION
+NO SKIDDING
