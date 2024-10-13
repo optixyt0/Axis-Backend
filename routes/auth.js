@@ -3,26 +3,27 @@ const app = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/user.js');
+const Token = require('../models/token.js');
 const uuid = require("uuid");
 require('dotenv').config();
 
 app.post("/account/api/oauth/token", async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
-        return res.status(400).json({ errorCode: "com.axis.backend.oauth.invalid_request", errorMessage: "Email and Password are required.", numericErrorCode: "1013" });
+        return res.status(400).json({ errorCode: "com.axis.backend.oauth.invalid_request", errorMessage: "Email and Password are required." });
     }
     const user = User.findOne({ email: username });
     if (!user) {
-        return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "No account was found with that email.", numericErrorCode: "18031" });
+        return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "No account was found with that email." });
     }
 
     const isPasswordCorrect = bcrypt.compare(password, user.password)
     if (!isPasswordCorrect) {
-        return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "You have provided the incorrect password.", numericErrorCode: "18031" });
+        return res.status(400).json({ errorCode: "com.axis.backend.incorrect-credentials", errorMessage: "You have provided the incorrect password." });
     }
 
     if (user.banned) {
-        return res.status(400).json({ errorCode: "com.axis.backend.banned", errorMessage: "You are permanently banned from Axis.", numericErrorCode: "-1" });
+        return res.status(400).json({ errorCode: "com.axis.backend.banned", errorMessage: "You are permanently banned from Axis." });
     }
 
     const authHeader = req.headers["authorization"];
@@ -42,34 +43,39 @@ app.post("/account/api/oauth/token", async (req, res) => {
         throw new Error("ClientId could not be extracted");
     }
     const deviceId = uuid.v4().replace(/-/ig, "");
-    const expiresIn = "8";
-    const accessToken = jwt.sign({
-        "app": "fortnite",
-        "sub": user.accountId,
-        "dvid": deviceId,
-        "mver": false,
-        "clid": clientId,
-        "dn": user.username,
-        "am": "password",
-        "p": Buffer.from(functions.MakeID()).toString("base64"),
-        "iai": user.accountId,
-        "sec": 1,
-        "clsvc": "fortnite",
-        "t": "s",
-        "ic": true,
-        "jti": functions.MakeID().replace(/-/ig, ""),
-        "creation_date": new Date(),
-        "hours_expire": expiresIn
-    }, process.env.JWT_SECRET, { expiresIn: `${expiresIn}h` });
+
+    let current_token = await Token.findOne({ accountId: user.accountId });
+
+    if (!current_token || new Date() > current_token.expiresAt) {
+        const newAccessToken = crypto.randomBytes(32).toString('hex');
+        const newRefreshToken = crypto.randomBytes(32).toString('hex');
+
+        if (current_token) {
+            current_token.token = newAccessToken;
+            current_token.expiresAt = new Date(Date.now() + 28800 * 1000);
+            current_token.refreshToken = newRefreshToken;
+            current_token.refreshExpiresAt = new Date(Date.now() + 86400 * 1000);
+        } else {
+            current_token = new Token({
+                token: newAccessToken,
+                accountId: user.accountId,
+                expiresAt: new Date(Date.now() + 28800 * 1000),
+                refreshToken: newRefreshToken,
+                refreshExpiresAt: new Date(Date.now() + 86400 * 1000)
+            });
+        }
+
+        await current_token.save();
+    }
 
     res.json({
-        access_token: `axisaccesswhen?`,
-        expires_in: expiresIn,
-        expires_at: "",
-        token_type: "bearer",
-        refresh_token: `axisrefreshwhen?`,
-        refresh_expires: "",
-        refresh_expires_at: "",
+        access_token: current_token.token,
+        expires_in: Math.round((new Date(current_token.expiresAt).getTime() - Date.now()) / 1000),
+        expires_at: current_token.expiresAt.toISOString(),
+        token_type: 'bearer',
+        refresh_token: current_token.refreshToken,
+        refresh_expires: Math.round((new Date(current_token.refreshExpiresAt).getTime() - Date.now()) / 1000),
+        refresh_expires_at: current_token.refreshExpiresAt.toISOString(),
         account_id: user.accountId,
         client_id: clientId,
         internal_client: true,
@@ -80,3 +86,5 @@ app.post("/account/api/oauth/token", async (req, res) => {
         device_id: deviceId
     });
 });
+
+module.exports = app;
