@@ -17,4 +17,12 @@ app.get('/fortnite/api/game/v2/enabled_features', (req, res) => {
     return res.status(200).send([]);
 })
 
+app.get("/fortnite/api/v2/versioncheck/Windows", (req, res) => {
+    const { version } = req.query;
+    
+
+    res.status(200).json({ type: "NO_UPDATE"})
+
+})
+
 module.exports = app;

@@ -1,4 +1,5 @@
 # Axis-Backend
 Fully custom OGFN backend, work in progress
 
-NO SKIDDING
+## Credits:
+- ObsessedTech for help with auth and profiles
